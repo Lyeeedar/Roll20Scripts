@@ -42,12 +42,12 @@ StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration,
 	for (var index = 0; index < state.activeStatus.length; index++) {
 		var existing = state.activeStatus[index];
 		
-		if (existing.statusName == statusName) {
+		if (existing.Name == statusName) {
 			var existingDuration = Number(existing.Duration || 1);
 			
 			existing.Duration = Math.max(existingDuration, Duration);
 			StatusTracker.SendMessage("Status already exists, updating duration", true);
-			StatusTracker.SetMarker(CharID, Marker, Duration-1);
+			StatusTracker.SetMarker(CharID, Marker, existing.Duration);
 			
 			return;
 		}
@@ -243,8 +243,6 @@ on("change:campaign:turnorder", function() {
 
 
 on("chat:message", function(msg) {
-    StatusTracker.LoadAllStatusTags();
-
     var cmd = "!StatusAdd ";
     
     if (msg.type === "api" && msg.content.includes(cmd)) {
@@ -325,4 +323,8 @@ on("chat:message", function(msg) {
         state.activeStatus = new Array();
         sendChat("","/desc All statuses removed.");
     }
+});
+
+on("ready", function() {
+	StatusTracker.LoadAllStatusTags();
 });
