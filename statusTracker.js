@@ -1,6 +1,12 @@
+state.statusTagLookup = {};
+
 state.activeStatus = state.activeStatus || new Array();
  
 var StatusTracker = StatusTracker || {};
+
+StatusTracker.LoadAllStatusTags = function() {
+    JSON.parse(Campaign().get('_token_markers')||'[]').forEach( tm => state.statusTagLookup[tm.name] = tm.tag);
+};
 
 StatusTracker.SetCharacterCondition = function(CharID, statusName, value) {	
 	var Chars = findObjs({
@@ -84,16 +90,18 @@ StatusTracker.SetMarker = function(CharID, Marker, Count) {
         _pageid: Campaign().get("playerpageid"),
     });    
     _.each(currChar, function(obj) {
+        var tag = state.statusTagLookup[Marker] || state.statusTagLookup["info"];
+
         if (Count === 0) {
-            obj.set("status_" + Marker, false);
+            obj.set("status_" + tag, false);
         } else if (Count === 1) {
-            obj.set("status_" + Marker, true);
+            obj.set("status_" + tag, true);
         } else {
             if (Count > 9) {
                 Count = 9;
             }
 
-            obj.set("status_" + Marker, "" + Count);
+            obj.set("status_" + tag, "" + Count);
         }
     });
 }
@@ -234,7 +242,9 @@ on("change:campaign:turnorder", function() {
 });
 
 
-on("chat:message", function(msg) {   
+on("chat:message", function(msg) {
+    StatusTracker.LoadAllStatusTags();
+
     var cmd = "!StatusAdd ";
     
     if (msg.type === "api" && msg.content.includes(cmd)) {
