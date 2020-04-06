@@ -251,12 +251,16 @@ on("chat:message", function(msg) {
         var cleanedMsg = msg.content.replace(cmd, "");
  
         //Pulls any marker first
-        var marker = cleanedMsg.split("// ")[1] || "purple";
+        var marker = cleanedMsg.split("// ")[1] || undefined;
         cleanedMsg = cleanedMsg.split("//")[0];
         
         //Pulls the effect name
         var statusName = cleanedMsg.split(" ")[0];
         cleanedMsg = cleanedMsg.substr(statusName.length + 1) //Removes the target from the array
+
+        if (marker === undefined) {
+            marker = statusName;
+        }
  
         //Pulls the duration
         var Duration = cleanedMsg.split(" ")[0];
