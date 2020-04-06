@@ -153,7 +153,7 @@ StatusTracker.SendMessage = function(message) {
     sendChat("", message);
 }
 
-StatusTracker.GetStatusMessage = function(charName, statusName, duration, description) {
+StatusTracker.GetStatusMessage = function(statusName, duration, description) {
 	var endMessage = " for " + (duration - 1) + " rounds";
 	if (duration === -1) {
 		endMessage = "";
@@ -161,11 +161,7 @@ StatusTracker.GetStatusMessage = function(charName, statusName, duration, descri
 		endMessage = " ends";
 	}
 	
-	return "<div>" + charName + " <a style='color:DeepSkyBlue' title='" + description + "'>" + statusName + "</a>" + endMessage + "</div>";
-}
-
-StatusTracker.SendStatusMessage = function(charName, statusName, duration, description) {
-	StatusTracker.SendMessage("/direct " + StatusTracker.GetStatusMessage(charName, statusName, duration, description));
+	return "<a style='color:DeepSkyBlue' title='" + description + "'>" + statusName + "</a>" + endMessage + "";
 }
 
 StatusTracker.NewTurn = function(CharID) {    
@@ -202,8 +198,8 @@ StatusTracker.NewTurn = function(CharID) {
 			}
 			
 			//Still active, announced
-			var message = StatusTracker.GetStatusMessage("", status.Name, Duration, status.Description);
-			statusMessages += "<li>" + message + "</li>";
+			var message = StatusTracker.GetStatusMessage(status.Name, Duration, status.Description);
+			statusMessages += "<li><div align='left'>" + message + "</div></li>";
 			
 			//Ending effects
 			if (status.Duration === 0) {
