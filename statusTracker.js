@@ -84,43 +84,18 @@ StatusTracker.SetMarker = function(CharID, Marker, Count) {
         _pageid: Campaign().get("playerpageid"),
     });    
     _.each(currChar, function(obj) {
-        var original = obj.get("statusmarkers");
-        var toSet = StatusTracker.SetMarkerOnString(original, Marker, Count);
-        obj.set("statusmarkers", toSet);
-    });
-}
-
-StatusTracker.SetMarkerOnString = function(Original, Marker, Count) {
-    var splitOriginal = Original.split(",");
-    
-    var markerWithCount = Marker;
-    if (Count > 1) {
-        markerWithCount += "@" + Count;
-    }
-	
-	var found = false;
-	for (var index = 0; index < splitOriginal.length; index++) {
-		var original = splitOriginal[index];
-		
-		if (original === Marker || original.startsWith(Marker + "@")) {
-
-			if (Count === 0) {
-                splitOriginal.splice(index, 1);
-				return splitOriginal.join();
+        if (Count === 0) {
+            obj.set("status_" + Marker, false);
+        } else if (Count === 1) {
+            obj.set("status_" + Marker, true);
+        } else {
+            if (Count > 9) {
+                Count = 9;
             }
-            
-			splitOriginal[index] = markerWithCount;
-			
-			found = true;
-			break;
-		}
-	}
-	
-	if (found || Count === 0) {
-		return splitOriginal.join();
-    } else {
-        return Original + "," + markerWithCount;
-    }
+
+            obj.set("status_" + Marker, "" + Count);
+        }
+    });
 }
 
 StatusTracker.GetTokenName = function(CharID) {
