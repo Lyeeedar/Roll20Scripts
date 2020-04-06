@@ -31,7 +31,6 @@ StatusTracker.SetCharacterCondition = function(CharID, statusName, value) {
 
 //Adding a status to the tracker
 StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration, Marker) {
-	log("add status " + statusName);
     if (CharID == "") return; //Don't add empty statuses
 	
 	for (var index = 0; index < state.activeStatus.length; index++) {
@@ -86,11 +85,8 @@ StatusTracker.SetMarker = function(CharID, Marker, Count) {
     });    
     _.each(currChar, function(obj) {
         var original = obj.get("statusmarkers");
-        log("original: " + original);
         var toSet = StatusTracker.SetMarkerOnString(original, Marker, Count);
-        log("toSet: " + toSet);
         obj.set("statusmarkers", toSet);
-        log("set: " + obj.get("statusmarkers"));
     });
 }
 
@@ -109,9 +105,7 @@ StatusTracker.SetMarkerOnString = function(Original, Marker, Count) {
 		if (original === Marker || original.startsWith(Marker + "@")) {
 
 			if (Count === 0) {
-                log("presplice " + splitOriginal.join());
                 splitOriginal.splice(index, 1);
-                log("postsplice " + splitOriginal.join());
 				return splitOriginal.join();
             }
             
@@ -154,17 +148,17 @@ StatusTracker.SendMessage = function(message) {
 }
 
 StatusTracker.GetStatusMessage = function(statusName, duration, description) {
-	var endMessage = " for " + (duration - 1) + " rounds";
+	var endMessage = " for " + duration + " rounds";
 	if (duration === -1) {
 		endMessage = "";
 	} else if (duration === 1) {
-		endMessage = " ends";
+		endMessage = " ending";
 	}
 	
 	return "<a style='color:DeepSkyBlue' title='" + description + "'>" + statusName + "</a>" + endMessage + "";
 }
 
-StatusTracker.NewTurn = function(CharID) {    
+StatusTracker.PrintCharacterStatus = function(CharID) {
     //loops through all durations and effects ones on the current character/token
     if (state.activeStatus.length == 0) return;
     
@@ -179,9 +173,40 @@ StatusTracker.NewTurn = function(CharID) {
     //Extract the current tokens name
     var charName = StatusTracker.GetTokenName(CharID)
     
-    StatusTracker.SendMessage("/direct <b>" + charName + " status</b>")
+	var statusMessages = "/direct <b>" + charName + " status</b><ul>";
+    for (var index = 0; index < state.activeStatus.length; index++) {
+		var status = state.activeStatus[index];
+        
+        //Decrement Duration
+        var Duration = Number(status.Duration || 1);
+ 
+		if (status.CharID == CharID) {		
+			//Still active, announced
+            var message = StatusTracker.GetStatusMessage(status.Name, Duration, status.Description);
+            var removeMessage = "";
+            if (Duration > 1 || Duration === -1) {
+                removeMessage = "  <a style='background:transparent; color:Red; float:right;padding:0' href='!StatusDel " + status.Name + " " + CharID + "'>Remove</a>";
+            }
 
-	var statusMessages = "<ul>";
+			statusMessages += "<li><div align='left' style='clear:both'>" + message + removeMessage + "</div></li>";
+		}
+    }
+	statusMessages += "</ul><hr>";
+	StatusTracker.SendMessage(statusMessages);
+}
+
+StatusTracker.NewTurn = function(CharID) {    
+    //loops through all durations and effects ones on the current character/token
+    if (state.activeStatus.length == 0) return;
+    
+    //If the current token does not have any statues, exit
+	var count = 0;
+    for (var index = 0; index < state.activeStatus.length; index++) {
+		var status = state.activeStatus[index];
+        if (status.CharID == CharID) { count++ }
+    }
+    if (count == 0) return;
+        
     for (var index = 0; index < state.activeStatus.length; index++) {
 		var status = state.activeStatus[index];
         
@@ -197,24 +222,16 @@ StatusTracker.NewTurn = function(CharID) {
 				StatusTracker.SetMarker(CharID, status.Marker, status.Duration);
 			}
 			
-			//Still active, announced
-			var message = StatusTracker.GetStatusMessage(status.Name, Duration, status.Description);
-			statusMessages += "<li><div align='left'>" + message + "</div></li>";
-			
 			//Ending effects
 			if (status.Duration === 0) {
                 StatusTracker.DelStatus(status.CharID, status.Name);
-                sendChat("StatusTracker", "Delete status " + status.Name);
 				
 				index--;
 			}
 		}
     }
-	statusMessages += "</ul>";
-	StatusTracker.SendMessage(statusMessages);
-	
-    StatusTracker.SendMessage("/direct <hr>")
-    return;
+    
+    StatusTracker.PrintCharacterStatus(CharID);
 }
  
 StatusTracker.GetCurrentToken = function() {
@@ -249,7 +266,7 @@ on("chat:message", function(msg) {
         var cleanedMsg = msg.content.replace(cmd, "");
  
         //Pulls any marker first
-        var marker = cleanedMsg.split("// ")[1] || StatusTracker.statusIndicator;
+        var marker = cleanedMsg.split("// ")[1] || "purple";
         cleanedMsg = cleanedMsg.split("//")[0];
         
         //Pulls the effect name
@@ -274,6 +291,8 @@ on("chat:message", function(msg) {
                 StatusTracker.AddStatus(obj._id, statusName, statusDescription, Duration, marker);
 				var tokenName = StatusTracker.GetTokenName(obj._id);
                 sendChat("","/desc " + statusName + " added to " + tokenName + ".");
+
+                StatusTracker.PrintCharacterStatus(obj._id);
             }
         })
     }
@@ -284,21 +303,29 @@ on("chat:message", function(msg) {
     
     if (msg.type == "api" && msg.content.includes(cmd)) {
         
-        var CharID = "";
-        
         var cleanedMsg = msg.content.replace(cmd, "");
         
-        //Pulls the effect name
         var statusName = cleanedMsg.split(" ")[0];
-        cleanedMsg = cleanedMsg.substr(statusName.length + 1) //Removes the target from the array
-        
-        _.each(msg.selected, function (obj){
-            //Deletes the statud from each selected ID            
-            if (obj._type == "graphic") { //only if the selected is a token
-                StatusTracker.DelStatus(obj._id, statusName);
-				sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
-            }
-        })
+        cleanedMsg = cleanedMsg.substr(statusName.length + 1).trim();
+
+        if (cleanedMsg.length !== 0) {
+            var charID = cleanedMsg;
+            StatusTracker.DelStatus(charID, statusName);
+            var tokenName = StatusTracker.GetTokenName(charID);
+            sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
+
+            StatusTracker.PrintCharacterStatus(charID);
+        } else {
+            _.each(msg.selected, function (obj){
+                if (obj._type == "graphic") { //only if the selected is a token
+                    StatusTracker.DelStatus(obj._id, statusName);
+                    var tokenName = StatusTracker.GetTokenName(obj._id);
+                    sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
+
+                    StatusTracker.PrintCharacterStatus(obj._id);
+                }
+            })
+        }
     }
 });
 
