@@ -93,7 +93,7 @@ StatusTracker.SetMarker = function(CharID, Marker, Count) {
 
         if (Count === 0) {
             obj.set("status_" + tag, false);
-        } else if (Count === 1) {
+        } else if (Count === 1 || Count === -1) {
             obj.set("status_" + tag, true);
         } else {
             if (Count > 9) {
@@ -171,7 +171,7 @@ StatusTracker.PrintCharacterStatus = function(CharID) {
             var message = StatusTracker.GetStatusMessage(status.Name, Duration, status.Description);
             var removeMessage = "";
             if (Duration > 1 || Duration === -1) {
-                removeMessage = "  <a style='background:transparent; color:Red; float:right;padding:0' href='!StatusDel " + status.Name + " " + CharID + "'>Remove</a>";
+                removeMessage = "  <a style='background:transparent; color:Red; float:right;padding:0' href='!status del " + status.Name + " " + CharID + "'>Remove</a>";
             }
 
 			statusMessages += "<li><div align='left' style='clear:both'>" + message + removeMessage + "</div></li>";
