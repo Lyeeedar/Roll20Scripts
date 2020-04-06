@@ -10,7 +10,13 @@ StatusTracker.SetCharacterCondition = function(CharID, statusName, value) {
     if (Chars.length > 0 ) {
         var represents = Chars[0].get("represents");
 				
-		var character = getObj("character", represents);
+        var character = getObj("character", represents);
+        
+        if (character === undefined) {
+            sendChat("StatusTracker", "/w gm no character found for 'represents' " + character);
+            return;
+        }
+
 		var conditionValue = findObjs({_type: "attribute", name: "condition_" + statusName, _characterid: character.id})[0]
 		
 		if (conditionValue !== undefined) {			
@@ -36,7 +42,7 @@ StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration,
 			
 			existing.Duration = Math.max(existingDuration, Duration);
 			StatusTracker.SendMessage("Status already exists, updating duration", true);
-			StatusTracker.SetMarker(CharID, Marker, Duration);
+			StatusTracker.SetMarker(CharID, Marker, Duration-1);
 			
 			return;
 		}
@@ -56,7 +62,6 @@ StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration,
 }
  
 StatusTracker.DelStatus = function(CharID, Name){
-	var charName = StatusTracker.GetTokenName(CharID);
     for (var index = 0; index < state.activeStatus.length; index++) {
 		var status = state.activeStatus[index];
 		
@@ -80,42 +85,47 @@ StatusTracker.SetMarker = function(CharID, Marker, Count) {
         _pageid: Campaign().get("playerpageid"),
     });    
     _.each(currChar, function(obj) {
-        obj.set("statusmarkers", StatusTracker.SetMarkerOnString(obj.get("statusmarkers"), Marker, Count));
+        var original = obj.get("statusmarkers");
+        log("original: " + original);
+        var toSet = StatusTracker.SetMarkerOnString(original, Marker, Count);
+        log("toSet: " + toSet);
+        obj.set("statusmarkers", toSet);
+        log("set: " + obj.get("statusmarkers"));
     });
 }
 
 StatusTracker.SetMarkerOnString = function(Original, Marker, Count) {
-	var splitOriginal = Original.split(",");
-	var newString = new Array();
+    var splitOriginal = Original.split(",");
+    
+    var markerWithCount = Marker;
+    if (Count > 1) {
+        markerWithCount += "@" + Count;
+    }
 	
-	var added = false;
+	var found = false;
 	for (var index = 0; index < splitOriginal.length; index++) {
 		var original = splitOriginal[index];
 		
-		if (original === Marker || original.startsWith(Marker + "@")) {			
-			if (Count > 1) {
-				Marker += "@" + Count;
-			} else if (Count === -1) {
-				
-			} else {
-				splitOriginal.splice(index, 1);
-				break;
-			}
-			splitOriginal[index] = Marker;
+		if (original === Marker || original.startsWith(Marker + "@")) {
+
+			if (Count === 0) {
+                log("presplice " + splitOriginal.join());
+                splitOriginal.splice(index, 1);
+                log("postsplice " + splitOriginal.join());
+				return splitOriginal.join();
+            }
+            
+			splitOriginal[index] = markerWithCount;
 			
-			added = true;
+			found = true;
 			break;
 		}
 	}
 	
-	if (added === false ) {
-		if (Count > 1) {
-			Marker += "@" + Count;
-		}
-		
-        return Original + "," + Marker;
+	if (found || Count === 0) {
+		return splitOriginal.join();
     } else {
-        return splitOriginal.join();
+        return Original + "," + markerWithCount;
     }
 }
 
@@ -192,12 +202,13 @@ StatusTracker.NewTurn = function(CharID) {
 			}
 			
 			//Still active, announced
-			var message = StatusTracker.GetStatusMessage("", status.statusName, Duration, status.statusDescript);
+			var message = StatusTracker.GetStatusMessage("", status.Name, Duration, status.Description);
 			statusMessages += "<li>" + message + "</li>";
 			
 			//Ending effects
-			if (Duration === 1) {
-				StatusTracker.DelStatus(status.CharID, status.statusName);
+			if (status.Duration === 0) {
+                StatusTracker.DelStatus(status.CharID, status.Name);
+                sendChat("StatusTracker", "Delete status " + status.Name);
 				
 				index--;
 			}
@@ -292,5 +303,14 @@ on("chat:message", function(msg) {
 				sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
             }
         })
+    }
+});
+
+on("chat:message", function(msg) {   
+    var cmd = "!StatusClearAll";
+    
+    if (msg.type == "api" && msg.content.includes(cmd) && msg.who.includes("(GM)")) {
+        state.activeStatus = new Array();
+        sendChat("","/desc All statuses removed.");
     }
 });
