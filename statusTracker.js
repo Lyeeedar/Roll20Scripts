@@ -35,7 +35,6 @@ StatusTracker.SetCharacterCondition = function(CharID, statusName, value) {
 	}
 }
 
-//Adding a status to the tracker
 StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration, Marker) {
     if (CharID == "") return; //Don't add empty statuses
 	
@@ -136,9 +135,13 @@ StatusTracker.GetStatusMessage = function(statusName, duration, description) {
 		endMessage = "";
 	} else if (duration === 1) {
 		endMessage = " ending";
-	}
-	
-	return "<a style='color:DeepSkyBlue' title='" + description + "'>" + statusName + "</a>" + endMessage + "";
+    }
+    
+    if (description.startsWith("http")) {
+        return "<a style='color:DeepSkyBlue;background-colour:transparent;padding:0' href='" + description + "'>" + statusName + "</a>" + endMessage + "";
+    } else {
+	    return "<a style='color:DeepSkyBlue' title='" + description + "'>" + statusName + "</a>" + endMessage + "";
+    }
 }
 
 StatusTracker.PrintCharacterStatus = function(CharID) {
@@ -227,8 +230,69 @@ StatusTracker.GetCurrentToken = function() {
     var turn = turn_order.shift();
     return getObj('graphic', turn.id) || "";
 };
- 
-on("change:campaign:turnorder", function() {
+
+StatusTracker.OnStatusAdd = function(args, selected) {
+    var statusName = args[0];
+    var duration = args.length > 1 ? args[1] : -1;
+    var icon = args.length > 2 ? args[2] : statusName;
+    var description = args.length > 3 ? args[3] : "https://www.d20pfsrd.com/Gamemastering/conditions/#TOC-" + statusName.substr(0, 1).toUpperCase() + statusName.substr(1);
+
+    if (selected === undefined) {
+        sendChat("","/desc No tokens selected for " + statusName + ".")
+    }
+    
+    _.each(selected, function (obj){
+        if (obj._type == "graphic") {
+            StatusTracker.AddStatus(obj._id, statusName, description, duration, icon);
+
+            var tokenName = StatusTracker.GetTokenName(obj._id);
+            sendChat("","/desc " + statusName + " added to " + tokenName + ".");
+
+            StatusTracker.PrintCharacterStatus(obj._id);
+        }
+    });
+};
+
+StatusTracker.OnStatusDel = function(args, selected) {
+    var statusName = args[0];
+
+    if (args.length > 1) {
+        var charID = args[1];
+        StatusTracker.DelStatus(charID, statusName);
+        
+        var tokenName = StatusTracker.GetTokenName(charID);
+        sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
+
+        StatusTracker.PrintCharacterStatus(charID);
+    } else {
+        _.each(selected, function (obj){
+            if (obj._type == "graphic") {
+                StatusTracker.DelStatus(obj._id, statusName);
+
+                var tokenName = StatusTracker.GetTokenName(obj._id);
+                sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
+
+                StatusTracker.PrintCharacterStatus(obj._id);
+            }
+        });
+    }
+};
+
+StatusTracker.OnStatusClearAll = function(args, selected) {
+    state.activeStatus = new Array();
+    sendChat("","/desc All statuses removed.");
+};
+
+StatusTracker.OnStatusShow = function(args, selected) {
+
+    _.each(selected, function (obj) {
+        if (obj._type == "graphic") {
+            StatusTracker.PrintCharacterStatus(obj._id);
+        }
+    });
+};
+
+on("change:campaign:turnorder", function(args) {
     var status_current_token = StatusTracker.GetCurrentToken();
     
     //Handler for non-token items in initiative
@@ -241,87 +305,51 @@ on("change:campaign:turnorder", function() {
     StatusTracker.NewTurn(status_current_token.id);
 });
 
-
 on("chat:message", function(msg) {
-    var cmd = "!StatusAdd ";
-    
-    if (msg.type === "api" && msg.content.includes(cmd)) {
-        var cleanedMsg = msg.content.replace(cmd, "");
- 
-        //Pulls any marker first
-        var marker = cleanedMsg.split("// ")[1] || undefined;
-        cleanedMsg = cleanedMsg.split("//")[0];
-        
-        //Pulls the effect name
-        var statusName = cleanedMsg.split(" ")[0];
-        cleanedMsg = cleanedMsg.substr(statusName.length + 1) //Removes the target from the array
+    if (msg.type === "api" && msg.content.startsWith("!status")) {
+        var split = msg.content.splitArgs();
 
-        if (marker === undefined) {
-            marker = statusName;
-        }
- 
-        //Pulls the duration
-        var Duration = cleanedMsg.split(" ")[0];
-        cleanedMsg = cleanedMsg.substr(Duration.length + 1) //Removes the target from the array
- 
-        //The remainder is the description
-        var statusDescription = cleanedMsg;
-        
-        //Adds the status to each of the selected tokens
-		if (msg.selected === undefined) {
-			sendChat("","/desc No tokens selected for " + statusName + ".")
-		}
-		
-        _.each(msg.selected, function (obj){
-            //Runs through each selected token and adds the status
-            if (obj._type == "graphic") { //only if the selected is a token
-                StatusTracker.AddStatus(obj._id, statusName, statusDescription, Duration, marker);
-				var tokenName = StatusTracker.GetTokenName(obj._id);
-                sendChat("","/desc " + statusName + " added to " + tokenName + ".");
+        var verb = split[1];
+        var args = split.slice(2);
 
-                StatusTracker.PrintCharacterStatus(obj._id);
+        if (verb === "add") 
+        {
+            StatusTracker.OnStatusAdd(args, msg.selected);
+        } 
+        else if (verb === "del" || verb === "remove") 
+        {
+            StatusTracker.OnStatusDel(args, msg.selected);
+        } 
+        else if (verb === "clearall") 
+        {
+            if (msg.who.includes("(GM)")) {
+                StatusTracker.OnStatusClearAll(args, msg.selected);
+            } 
+            else 
+            {
+                sendChat("","/desc This is a GM only command.");
             }
-        })
-    }
-});
-
-on("chat:message", function(msg) {   
-    var cmd = "!StatusDel ";
-    
-    if (msg.type == "api" && msg.content.includes(cmd)) {
-        
-        var cleanedMsg = msg.content.replace(cmd, "");
-        
-        var statusName = cleanedMsg.split(" ")[0];
-        cleanedMsg = cleanedMsg.substr(statusName.length + 1).trim();
-
-        if (cleanedMsg.length !== 0) {
-            var charID = cleanedMsg;
-            StatusTracker.DelStatus(charID, statusName);
-            var tokenName = StatusTracker.GetTokenName(charID);
-            sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
-
-            StatusTracker.PrintCharacterStatus(charID);
-        } else {
-            _.each(msg.selected, function (obj){
-                if (obj._type == "graphic") { //only if the selected is a token
-                    StatusTracker.DelStatus(obj._id, statusName);
-                    var tokenName = StatusTracker.GetTokenName(obj._id);
-                    sendChat("","/desc " + statusName + " removed from " + tokenName + ".");
-
-                    StatusTracker.PrintCharacterStatus(obj._id);
-                }
-            })
         }
-    }
-});
+        else if (verb === "show")
+        {
+            StatusTracker.OnStatusShow(args, msg.selected);
+        }
+        else if (verb === "help" || verb === "?")
+        {
+            var message = "/direct !status usage:<ul>";
 
-on("chat:message", function(msg) {   
-    var cmd = "!StatusClearAll";
-    
-    if (msg.type == "api" && msg.content.includes(cmd) && msg.who.includes("(GM)")) {
-        state.activeStatus = new Array();
-        sendChat("","/desc All statuses removed.");
+            message += "<li>Add a status to the selected characters. Usage: !status add {name} {duration in rounds:-1 for permanent} {icon} {description}</li>";
+            message += "<li>Remove a status from the selected characters. Usage: !status del {name}</li>";
+            message += "<li>Show the status for the selected characters. Usage: !status show</li>";
+
+            message += "</ul>";
+
+            sendChat("", message);
+        }
+        else 
+        {
+            sendChat("","/desc Unknown status verb " + split[1] + ".")
+        }
     }
 });
 
