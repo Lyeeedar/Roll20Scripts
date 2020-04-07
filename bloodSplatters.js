@@ -193,8 +193,7 @@ on("ready", function (obj) {
           else return false;
         });
         _.each(objects, function (obj) {
-          obj.set("left", 0);
-          obj.set("top", 0);
+          obj.remove();
         });
       }
     }
