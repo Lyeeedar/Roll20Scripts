@@ -39,7 +39,8 @@ gmReminders.DoAttack = function(rawattack) {
             }
             var critvalue = critRange.split("-")[0];
 
-            var additional = match.length > 5 ? match[6] : "";
+            var additional = match[6];
+            if (additional === undefined) additional = "";
             var additionalParts = additional.split(" and ");
 
             var count = countRaw.startsWith("+") ? 1 : parseInt(countRaw);
@@ -145,11 +146,16 @@ gmReminders.GenerateNotes = function(CharID) {
             }
 
             if (line.startsWith("AC")) {
-                message += "<li><a style='color:DeepSkyBlue' title='" + line + "'>AC</a></li>";
+                var ac = line.split("(")[0];
+                message += "<li><a style='color:DeepSkyBlue' title='" + ac + "'>AC</a></li>";
             }
         
             if (line.startsWith("Defensive Abilities")) {
-                message += "<li><a style='color:DeepSkyBlue' title='" + line + "'>Defenses</a></li>";
+                message += "<li><a style='color:DeepSkyBlue' title='" + line.replace("Defensive Abilities ", "") + "'>Defenses</a></li>";
+            }
+
+            if (line.startsWith("Special Attacks")) {
+                message += "<li><a style='color:DeepSkyBlue' title='" + line.replace("Special Attacks ", "") + "'>Special Attacks</a></li>";
             }
         
             if (line.startsWith("Melee")) {
@@ -163,7 +169,7 @@ gmReminders.GenerateNotes = function(CharID) {
             }
 
             if (line.startsWith("Aura")) {
-                message += "<li><a style='color:DarkOrange' title='" + line + "'>Aura</a></li>";
+                message += "<li><a style='color:DarkOrange' title='" + line.replace("Aura ", "") + "'>Aura</a></li>";
             }
         }
     }
