@@ -11,6 +11,7 @@ mapCreate.Tile = function(CharID) {
     var width = token.get("width");
     var height = token.get("height");
     var pageID = token.get("_pageid");
+    var tint = token.get("tint_color");
 
     var page = getObj('page', pageID);
     if (page === undefined) {
@@ -30,7 +31,7 @@ mapCreate.Tile = function(CharID) {
     for (var x = 0; x < xCount; x++) {
         for (var y = 0; y < yCount; y++) {
             log("Create object at " + x + "," + y);
-            createObj('graphic', {
+            var obj = createObj('graphic', {
                 name: 'mapTile',
                 left: x * width,
                 top: y * height,
@@ -38,12 +39,61 @@ mapCreate.Tile = function(CharID) {
                 height: height,
                 imgsrc: img,
                 _pageid: pageID,
+                tint_color: tint,
                 layer: "map",
                 gmnotes: "generated: " + img
             });
+            toFront(obj);
         }
     }
     log("tile complete");
+};
+
+mapCreate.Scatter = function(CharID, Count) {
+    var token = getObj('graphic', CharID);
+    if (token === undefined) {
+        log("no token found");
+        return;
+    }
+
+    var img = token.get("imgsrc");
+    var width = token.get("width");
+    var height = token.get("height");
+    var pageID = token.get("_pageid");
+    var tint = token.get("tint_color");
+
+    var page = getObj('page', pageID);
+    if (page === undefined) {
+        log("no page found");
+        return;
+    }
+
+    token.remove();
+
+    var pageWidth = page.get("width");
+    var pageHeight = page.get("height");
+
+    log("beginning scatter");
+    for (var i = 0; i < Count; i++) {
+        var x = randomInteger(pageWidth);
+        var y = randomInteger(pageHeight);
+
+        log("Create object at " + x + "," + y);
+            var obj = createObj('graphic', {
+                name: 'mapTile',
+                left: x * 70,
+                top: y * 70,
+                width: width,
+                height: height,
+                imgsrc: img,
+                _pageid: pageID,
+                tint_color: tint,
+                layer: "map",
+                gmnotes: "generated: " + img
+            });
+            toFront(obj);
+    }
+    log("scatter complete");
 };
 
 mapCreate.Delete = function(CharID) {
@@ -76,6 +126,13 @@ on("chat:message", function(msg) {
             _.each(msg.selected, function (obj){
                 if (obj._type == "graphic") {
                     mapCreate.Delete(obj._id);
+                }
+            });
+        } else if (msg.content.startsWith("!scatter")) {
+            _.each(msg.selected, function (obj){
+                if (obj._type == "graphic") {
+                    var Count = parseInt(msg.content.replace("!scatter ", ""));
+                    mapCreate.Scatter(obj._id, Count);
                 }
             });
         }
