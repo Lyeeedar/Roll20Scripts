@@ -152,6 +152,47 @@ gmReminders.GenerateSpellbook = function(CharID) {
 	if (gmnotes.length === 0) {
 		return;
 	}
+
+	var name = /(.*?) CR/;
+	var namematch = gmnotes.match(name);
+
+	if (namematch === null) {
+		return;
+	}
+
+	var lines = gmnotes.split("<br>");
+
+	var spells = new Array();
+	var inSpells = false;
+	var clAndDetails = "";
+	for (var i = 0; i < lines.length; i++) {
+		var line = lines[i].trim();
+		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
+			inSpells = true;
+			clAndDetails = line.split("(")[1];
+		} else if (inSpells) {
+			if (line.length > 0 && !line.match(/^\d/)) {
+				break;
+			} else if (line.length > 0) {
+				spells.push(line);
+			}
+		}
+	}
+	if (!inSpells) {
+		log("No spells found in: " + gmnotes);
+		return;
+	}
+
+	var message = "<b>Spellbook for " + namematch[1] + "</b>";
+	message += "<div>" + clAndDetails + "</div>";
+
+	message += "<ul>";
+	for (var i = 0; i < spells.length; i++) {
+		message += "<li>" + spells[i] + "</li>";
+	}
+	message += "</ul>";
+
+	sendChat("gmReminder", "/w gm " + message)
 };
 
 gmReminders.GenerateNotes = function (CharID) {
@@ -260,9 +301,9 @@ gmReminders.GenerateNotes = function (CharID) {
 				"'>Aura</a></li>";
 		}
 
-		if (line.includes(" Spells Prepared (CL ")) {
+		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
 			message +=
-				"<li><a style='color:DarkMagenta' href='!spellbook " + CharID + "'>Spellbook</a></li>";
+				"<li><a style='background:transparent; padding:0; color:DarkMagenta' href='!spellbook " + CharID + "'>Spellbook</a></li>";
 		}
 	}
 
@@ -319,6 +360,8 @@ on("chat:message", function (msg) {
 			});
 		} else if (msg.content.startsWith("!doattack")) {
 			gmReminders.DoAttack(msg.content.replace("!doattack ", ""));
+		} else if (msg.content.startsWith("!spellbook")) {
+			gmReminders.GenerateSpellbook(msg.content.replace("!spellbook ", ""));
 		}
 	}
 });
