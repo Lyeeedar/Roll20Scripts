@@ -332,6 +332,93 @@ gmReminders.GenerateSpellbook = function(CharID) {
 	sendChat("gmReminder", "/w gm " + message)
 };
 
+gmReminders.ParseCreatureStatBlock = function(statblock) {
+	var lines = statblock.split("<br>");
+
+	var creature = {};
+
+	var sectionTitles = ["OFFENSE", "DEFENSE", "STATISTICS", "SPECIAL ABILITIES", "TACTICS", "ECOLOGY"];
+
+	var inTactics = false;
+	var inSpecialAbilities = false;
+	for (var index = 0; index < lines.length; index++) {
+		var line = lines[index];
+
+		if (line.startsWith("SpellConsumeMap ")) {
+			continue;
+		}
+
+		var isNewSection = false;
+		for (var i = 0; i < sectionTitles.length; i++) {
+			if (line.toUpperCase().startsWith(sectionTitles[i])) {
+				isNewSection = true;
+				break;
+			}
+		}
+		if (isNewSection) {
+			inTactics = false;
+			inSpecialAbilities = false;
+		}
+
+		if (line.toUpperCase().startsWith("TACTICS")) {
+			inTactics = true;
+		} else if (inTactics) {
+			var tactics = creature["tactics"] || "";
+			tactics += line + "\n";
+			creature["tactics"] = tactics;
+		}
+
+		if (line.toUpperCase().startsWith("SPECIAL ABILITIES")) {
+			inSpecialAbilities = true;
+		} else if (inSpecialAbilities) {
+			var sa = creature["specialabilities"] || "";
+			sa += line + "\n";
+			creature["specialabilities"] = sa;
+		}
+
+		var fastHealing = /fast healing ([0-9]+)/;
+		var match = line.match(fastHealing);
+		if (match !== null) {
+			creature["fasthealing"] = match[1];
+		}
+
+		if (line.startsWith("hp ")) {
+			creature["hp"] = line.replace("hp ", "").split("(")[0];
+		}
+
+		if (line.startsWith("AC")) {
+			var ac = line.split("(")[0];
+			creature["ac"] = ac;
+		}
+
+		gmReminders.InsertIfMatches(line, /CMD [0-9]+/, creature, "cmd");
+		gmReminders.InsertIfMatches(line, /Fort \+[0-9]+/, creature, "fort");
+		gmReminders.InsertIfMatches(line, /Ref \+[0-9]+/, creature, "ref");
+		gmReminders.InsertIfMatches(line, /Will \+[0-9]+/, creature, "will");
+		gmReminders.InsertIfMatches(line, /Defensive Abilities [^;]+/, creature, "defensiveabilities");
+		gmReminders.InsertIfMatches(line, /Resist [^;]+/, creature, "resist");
+		gmReminders.InsertIfMatches(line, /Immune [^;]+/, creature, "immune");
+		gmReminders.InsertIfMatches(line, /DR [^;]+/, creature, "dr");
+		gmReminders.InsertIfMatches(line, /SR [^;]+/, creature, "sr");
+		gmReminders.InsertIfMatches(line, /Weaknesses [^;]+/, creature, "weaknesses");
+		gmReminders.InsertIfMatches(line, /Special Attacks [^;]+/, creature, "specialattacks");
+		gmReminders.InsertIfMatches(line, /Melee .*/, creature, "melee");
+		gmReminders.InsertIfMatches(line, /Ranged .*/, creature, "ranged");
+		gmReminders.InsertIfMatches(line, /CMB \+[0-9]+/, creature, "cmb");
+		gmReminders.InsertIfMatches(line, /Aura .*/, creature, "aura");
+		gmReminders.InsertIfMatches(line, /Speed .*/, creature, "speed");
+		gmReminders.InsertIfMatches(line, /Init [^;]+/, creature, "init");
+		gmReminders.InsertIfMatches(line, /Space [^;]+/, creature, "space");
+		gmReminders.InsertIfMatches(line, /Reach [^;]+/, creature, "reach");
+
+		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
+			creature["spells"] = line;
+		}
+	}
+
+	return creature;
+}
+
 gmReminders.GenerateNotes = function (CharID) {
 	var currChar = getObj("graphic", CharID);
 	if (currChar === undefined) {
@@ -355,21 +442,110 @@ gmReminders.GenerateNotes = function (CharID) {
 
 	var message = "";
 
-	var lines = gmnotes.split("<br>");
-	var inTactics = false;
-	for (var index = 0; index < lines.length; index++) {
-		var line = lines[index];
+	var creature = gmReminders.ParseCreatureStatBlock(gmnotes);
 
-		if (
-			line.startsWith("OFFENSE") ||
-			line.startsWith("DEFENSE") ||
-			line.startsWith("STATISTICS") ||
-			line.startsWith("SPECIAL ABILITIES")
-		) {
-			inTactics = false;
-		} else if (line.startsWith("Tactics") || line.startsWith("TACTICS")) {
-			inTactics = true;
-		} else if (inTactics) {
+	if (creature["aura"] !== undefined) {
+		message +=
+				"<li><a style='color:DarkOrange' title='" +
+				creature["aura"].replace("Aura ", "") +
+				"'>Aura</a></li>";
+	}
+
+	if (creature["fasthealing"] !== undefined) {
+		message += "<li>Fast Healing: " + creature["fasthealing"] + "</li>";
+	}
+
+	if (creature["ac"] !== undefined) {
+		var ac = creature["ac"];
+		ac += " " + creature["cmd"];
+
+		var fort = creature["fort"];
+		var fortButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Fort 1d20" + fort.replace("Fort ", "") + "' title='" + fort + "'>Fort</a>"
+
+		var ref = creature["ref"];
+		var refButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Ref 1d20" + ref.replace("Ref ", "") + "' title='" + ref + "'>Ref</a>"
+
+		var will = creature["will"];
+		var willButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Will 1d20" + will.replace("Will ", "") + "' title='" + will + "'>Will</a>"
+
+		message +=
+			"<li><a style='color:DeepSkyBlue' title='" +
+			ac +
+			"'>AC</a>" + fortButton + refButton + willButton + "</li>";
+	}
+
+	var defenses = [];
+	if (creature["defensiveabilities"] !== undefined) defenses.push(creature["defensiveabilities"]);
+	if (creature["dr"] !== undefined) defenses.push(creature["dr"]);
+	if (creature["resist"] !== undefined) defenses.push(creature["resist"]);
+	if (creature["immune"] !== undefined) defenses.push(creature["immune"]);
+	if (creature["sr"] !== undefined) defenses.push(creature["sr"]);
+	
+	if (defenses.length > 0) {
+		message += "<li><a style='color:DeepSkyBlue' title='" + defenses.join("&#10;") + "'>Defenses</a></li>";
+	}
+
+	if (creature["specialattacks"] !== undefined) {
+		message +=
+			"<li><a style='color:DeepSkyBlue' title='" +
+			creature["specialattacks"].replace("Special Attacks ", "") +
+			"'>Special Attacks</a></li>";
+	}
+
+	if (creature["melee"] !== undefined) {
+		var attackButton = gmReminders.BuildAttackButtons(
+			creature["melee"].replace("Melee ", "")
+		);
+
+		var cmb = creature["cmb"];
+		var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-CMB 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
+
+		message +=
+			"<li><div align='left' style='clear:both'>Melee:" +
+			attackButton + cmbButton +
+			"</div></li>";
+	}
+
+	if (creature["ranged"] !== undefined) {
+		var attackButton = gmReminders.BuildAttackButtons(
+			creature["ranged"].replace("Ranged ", "")
+		);
+		message +=
+			"<li><div align='left' style='clear:both'>Ranged:" +
+			attackButton +
+			"</div></li>";
+	}
+
+	if (creature["spells"] !== undefined) {
+		message +=
+			"<li><a style='background:transparent; padding:0; color:DarkMagenta' href='!spellbook " + CharID + "'>Spellbook</a></li>";
+	}
+
+	if (creature["specialabilities"] !== undefined) {
+		var tacticsLines = creature["specialabilities"].split("\n");
+		for (var i = 0; i < tacticsLines.length; i++) {
+			var line = tacticsLines[i];
+
+			var splitIndex = line.indexOf(")");
+			if (splitIndex === -1) continue;
+
+			var title = line.substr(0, splitIndex + 1);
+			var body = line.substr(splitIndex + 2);
+
+			message +=
+				"<li><a style='color:GoldenRod' title='" +
+				body +
+				"'>" +
+				title +
+				"</a></li>";
+		}
+	}
+
+	if (creature["tactics"] !== undefined) {
+		var tacticsLines = creature["tactics"].split("\n");
+		for (var i = 0; i < tacticsLines.length; i++) {
+			var line = tacticsLines[i];
+
 			var splitIndex = line.indexOf(":");
 			if (splitIndex === -1) continue;
 
@@ -382,81 +558,6 @@ gmReminders.GenerateNotes = function (CharID) {
 				"'>" +
 				title +
 				"</a></li>";
-		}
-
-		var fastHealing = /fast healing ([0-9]+)/;
-		var match = line.match(fastHealing);
-		if (match !== null) {
-			message += "<li>Fast Healing: " + match[1] + "</li>";
-		}
-
-		if (line.startsWith("AC")) {
-			var ac = line.split("(")[0];
-			ac += " " + gmReminders.GetRegexMatch(gmnotes, /CMD [0-9]+/);
-
-			var fort = gmReminders.GetRegexMatch(gmnotes, /Fort \+[0-9]+/);
-			var fortButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Fort 1d20" + fort.replace("Fort ", "") + "' title='" + fort + "'>Fort</a>"
-
-			var ref = gmReminders.GetRegexMatch(gmnotes, /Ref \+[0-9]+/);
-			var refButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Ref 1d20" + ref.replace("Ref ", "") + "' title='" + ref + "'>Ref</a>"
-
-			var will = gmReminders.GetRegexMatch(gmnotes, /Will \+[0-9]+/);
-			var willButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Will 1d20" + will.replace("Will ", "") + "' title='" + will + "'>Will</a>"
-
-			message +=
-				"<li><a style='color:DeepSkyBlue' title='" +
-				ac +
-				"'>AC</a>" + fortButton + refButton + willButton + "</li>";
-		}
-
-		if (line.startsWith("Defensive Abilities")) {
-			message +=
-				"<li><a style='color:DeepSkyBlue' title='" +
-				line.replace("Defensive Abilities ", "") +
-				"'>Defenses</a></li>";
-		}
-
-		if (line.startsWith("Special Attacks")) {
-			message +=
-				"<li><a style='color:DeepSkyBlue' title='" +
-				line.replace("Special Attacks ", "") +
-				"'>Special Attacks</a></li>";
-		}
-
-		if (line.startsWith("Melee")) {
-			var attackButton = gmReminders.BuildAttackButtons(
-				line.replace("Melee ", "")
-			);
-
-			var cmb = gmReminders.GetRegexMatch(gmnotes, /CMB \+[0-9]+/);
-			var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-CMB 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
-
-			message +=
-				"<li><div align='left' style='clear:both'>Melee:" +
-				attackButton + cmbButton +
-				"</div></li>";
-		}
-
-		if (line.startsWith("Ranged")) {
-			var attackButton = gmReminders.BuildAttackButtons(
-				line.replace("Ranged ", "")
-			);
-			message +=
-				"<li><div align='left' style='clear:both'>Ranged:" +
-				attackButton +
-				"</div></li>";
-		}
-
-		if (line.startsWith("Aura")) {
-			message +=
-				"<li><a style='color:DarkOrange' title='" +
-				line.replace("Aura ", "") +
-				"'>Aura</a></li>";
-		}
-
-		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
-			message +=
-				"<li><a style='background:transparent; padding:0; color:DarkMagenta' href='!spellbook " + CharID + "'>Spellbook</a></li>";
 		}
 	}
 
@@ -479,6 +580,14 @@ gmReminders.GetRegexMatch = function (content, regex) {
 	}
 
 	return "";
+};
+
+gmReminders.InsertIfMatches = function (content, regex, creature, key) {
+	var match = content.match(regex);
+	if (match !== null) {
+		var value = match[0];
+		creature[key] = value;
+	}
 };
 
 gmReminders.GetCurrentToken = function () {
