@@ -345,12 +345,13 @@ gmReminders.GenerateNotes = function (CharID) {
 		return;
 	}
 
-	var name = /(.*?) CR/;
-	var namematch = gmnotes.match(name);
+	var nameRegex = /(.*?) CR/;
+	var namematch = gmnotes.match(nameRegex);
 
 	if (namematch === null) {
 		return;
 	}
+	var name = namematch[1];
 
 	var message = "";
 
@@ -391,10 +392,21 @@ gmReminders.GenerateNotes = function (CharID) {
 
 		if (line.startsWith("AC")) {
 			var ac = line.split("(")[0];
+			ac += " " + gmReminders.GetRegexMatch(gmnotes, /CMD [0-9]+/);
+
+			var fort = gmReminders.GetRegexMatch(gmnotes, /Fort \+[0-9]+/);
+			var fortButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Fort 1d20" + fort.replace("Fort ", "") + "' title='" + fort + "'>Fort</a>"
+
+			var ref = gmReminders.GetRegexMatch(gmnotes, /Ref \+[0-9]+/);
+			var refButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Ref 1d20" + ref.replace("Ref ", "") + "' title='" + ref + "'>Ref</a>"
+
+			var will = gmReminders.GetRegexMatch(gmnotes, /Will \+[0-9]+/);
+			var willButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Will 1d20" + will.replace("Will ", "") + "' title='" + will + "'>Will</a>"
+
 			message +=
 				"<li><a style='color:DeepSkyBlue' title='" +
 				ac +
-				"'>AC</a></li>";
+				"'>AC</a>" + fortButton + refButton + willButton + "</li>";
 		}
 
 		if (line.startsWith("Defensive Abilities")) {
@@ -415,9 +427,13 @@ gmReminders.GenerateNotes = function (CharID) {
 			var attackButton = gmReminders.BuildAttackButtons(
 				line.replace("Melee ", "")
 			);
+
+			var cmb = gmReminders.GetRegexMatch(gmnotes, /CMB \+[0-9]+/);
+			var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-CMB 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
+
 			message +=
 				"<li><div align='left' style='clear:both'>Melee:" +
-				attackButton +
+				attackButton + cmbButton +
 				"</div></li>";
 		}
 
@@ -448,7 +464,7 @@ gmReminders.GenerateNotes = function (CharID) {
 		sendChat(
 			"gmReminder",
 			"/w gm <b>Notes for " +
-				namematch[1] +
+				name +
 				":</b><ul>" +
 				message +
 				"<ul>"
@@ -459,7 +475,7 @@ gmReminders.GenerateNotes = function (CharID) {
 gmReminders.GetRegexMatch = function (content, regex) {
 	var match = content.match(regex);
 	if (match !== null) {
-		return match[0] + "; ";
+		return match[0];
 	}
 
 	return "";
@@ -475,6 +491,11 @@ gmReminders.GetCurrentToken = function () {
 	var turn = turn_order.shift();
 	return getObj("graphic", turn.id) || "";
 };
+
+gmReminders.ExecuteRoll = function(argsraw) {
+	var args = argsraw.split(" ");
+	sendChat("gmReminder", "/w gm " + args[0] + ": [[" + args[1] + "]]");
+}
 
 on("change:campaign:turnorder", function (args) {
 	var status_current_token = gmReminders.GetCurrentToken();
@@ -501,6 +522,8 @@ on("chat:message", function (msg) {
 			gmReminders.GenerateSpellbook(msg.content.replace("!spellbook ", ""));
 		} else if (msg.content.startsWith("!consumespell")) {
 			gmReminders.ConsumeSpell(msg.content.replace("!consumespell ", ""));
+		} else if (msg.content.startsWith("!roll")) {
+			gmReminders.ExecuteRoll(msg.content.replace("!roll ", ""));
 		}
 	}
 });
