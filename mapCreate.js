@@ -6,6 +6,10 @@ mapCreate.Tile = function(CharID) {
         log("no token found");
         return;
     }
+    if (token.get("layer") != "map") {
+        log("can only tile graphics on the map layer");
+        return;
+    }
 
     var img = token.get("imgsrc");
     var width = token.get("width");
@@ -53,6 +57,10 @@ mapCreate.Scatter = function(CharID, Count) {
     var token = getObj('graphic', CharID);
     if (token === undefined) {
         log("no token found");
+        return;
+    }
+    if (token.get("layer") != "map") {
+        log("can only tile graphics on the map layer");
         return;
     }
 
@@ -106,9 +114,7 @@ mapCreate.Delete = function(CharID) {
 
     var gmnotes = token.get("gmnotes");
     if (gmnotes.startsWith("generated: ")) {
-        var objects = filterObjs(function (obj) {
-            return obj.get("type") == "graphic" && obj.get("gmnotes") == gmnotes;
-        });
+        var objects = findObjs({type:'graphic', gmnotes:gmnotes});
 
         for (var i = 0; i < objects.length; i++) {
             objects[i].remove();

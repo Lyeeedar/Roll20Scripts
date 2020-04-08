@@ -187,11 +187,7 @@ on("ready", function (obj) {
         );
         return;
       } else {
-        objects = filterObjs(function (obj) {
-          if (obj.get("type") == "graphic" && obj.get("gmnotes") == "blood")
-            return true;
-          else return false;
-        });
+        objects = findObjs({type:'graphics', gmnotes:'blood'});
         _.each(objects, function (obj) {
           obj.remove();
         });
