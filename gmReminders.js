@@ -382,6 +382,15 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 			creature["fasthealing"] = match[1];
 		}
 
+		var nameRegex = /(.*?) CR /;
+		var namematch = line.match(nameRegex);
+		if (namematch !== null) {
+			var name = namematch[1];
+			name = name.replace("<p>", "");
+
+			creature["name"] = name;
+		}
+
 		if (line.startsWith("hp ")) {
 			creature["hp"] = line.replace("hp ", "").split("(")[0];
 		}
@@ -606,6 +615,64 @@ gmReminders.ExecuteRoll = function(argsraw) {
 	sendChat("gmReminder", "/w gm " + args[0] + ": [[" + args[1] + "]]");
 }
 
+gmReminders.CreateCharacter = function(CharID) {
+	var token = getObj("graphic", CharID);
+	if (token === undefined) {
+		return;
+	}
+
+	var gmnotes = token.get("gmnotes");
+	gmnotes = unescape(gmnotes);
+
+	if (gmnotes.length === 0) {
+		return;
+	}
+
+	var nameRegex = /(.*?) CR/;
+	var namematch = gmnotes.match(nameRegex);
+
+	if (namematch === null) {
+		return;
+	}
+
+	// parse data from gmnotes
+	var creature = gmReminders.ParseCreatureStatBlock(gmnotes);
+
+	// setup ac, hpbar, size on token
+	token.set("bar1_max", creature["hp"]);
+	token.set("bar1_value", creature["hp"]);
+
+	var acRaw = parseInt(creature["ac"].replace("AC ", "").split(",")[0]);
+	token.set("bar2_value", acRaw);
+
+	var size = parseInt((creature["space"] || "5 ft").split("ft")[0].trim());
+	if (size > 5) {
+		var units = size / 5;
+		var pixels = units * 70;
+
+		token.set("width", pixels);
+		token.set("height", pixels);
+	}
+
+	token.set("name", creature["name"]);
+	token.set("showname", true);
+
+	// create character
+	var char = createObj("character", {
+		avatar: token.get("imgsrc"),
+		name: creature["name"],
+		gmnotes: gmnotes,
+		archived: false,
+		inplayerjournals: '',
+		controlledby: ''
+	});
+	token.set("represents", char.get('_id'));
+	setDefaultTokenForCharacter(char, token);
+
+	// all done
+	sendChat("gmReminder", "/w gm Character created for " + creature["name"]);
+};
+
 on("change:campaign:turnorder", function (args) {
 	var status_current_token = gmReminders.GetCurrentToken();
 
@@ -633,6 +700,12 @@ on("chat:message", function (msg) {
 			gmReminders.ConsumeSpell(msg.content.replace("!consumespell ", ""));
 		} else if (msg.content.startsWith("!roll")) {
 			gmReminders.ExecuteRoll(msg.content.replace("!roll ", ""));
+		} else if (msg.content.startsWith("!createcharacter")) {
+			_.each(msg.selected, function (obj) {
+				if (obj._type == "graphic") {
+					gmReminders.CreateCharacter(obj._id);
+				}
+			});
 		}
 	}
 });
