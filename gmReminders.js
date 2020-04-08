@@ -417,8 +417,8 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 		gmReminders.InsertIfMatches(line, /Aura .*/, creature, "aura");
 		gmReminders.InsertIfMatches(line, /Speed .*/, creature, "speed");
 		gmReminders.InsertIfMatches(line, /Init [^;]+/, creature, "init");
-		gmReminders.InsertIfMatches(line, /Space [^;]+/, creature, "space");
-		gmReminders.InsertIfMatches(line, /Reach [^;]+/, creature, "reach");
+		gmReminders.InsertIfMatches(line, /Space [0-9]+ ft/, creature, "space");
+		gmReminders.InsertIfMatches(line, /Reach [0-9]+ ft/, creature, "reach");
 
 		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
 			creature["spells"] = line;
@@ -618,6 +618,7 @@ gmReminders.ExecuteRoll = function(argsraw) {
 gmReminders.CreateCharacter = function(CharID) {
 	var token = getObj("graphic", CharID);
 	if (token === undefined) {
+		sendChat("gmReminder", "/w gm No graphic found for charID");
 		return;
 	}
 
@@ -625,6 +626,7 @@ gmReminders.CreateCharacter = function(CharID) {
 	gmnotes = unescape(gmnotes);
 
 	if (gmnotes.length === 0) {
+		sendChat("gmReminder", "/w gm No gmnotes found");
 		return;
 	}
 
@@ -632,8 +634,11 @@ gmReminders.CreateCharacter = function(CharID) {
 	var namematch = gmnotes.match(nameRegex);
 
 	if (namematch === null) {
+		sendChat("gmReminder", "/w gm No name followed by CR found");
 		return;
 	}
+
+	sendChat("gmReminder", "/w gm Character creation started for " + namematch[1]);
 
 	// parse data from gmnotes
 	var creature = gmReminders.ParseCreatureStatBlock(gmnotes);
@@ -645,7 +650,7 @@ gmReminders.CreateCharacter = function(CharID) {
 	var acRaw = parseInt(creature["ac"].replace("AC ", "").split(",")[0]);
 	token.set("bar2_value", acRaw);
 
-	var size = parseInt((creature["space"] || "5 ft").split("ft")[0].trim());
+	var size = parseInt((creature["space"] || "Space 5 ft").split("Space")[1].split("ft")[0].trim());
 	if (size > 5) {
 		var units = size / 5;
 		var pixels = units * 70;
