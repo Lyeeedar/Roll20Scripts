@@ -140,6 +140,78 @@ gmReminders.BuildAttackButtons = function (attackraw) {
 	return output;
 };
 
+gmReminders.ParseSpellConsumeMap = function(spellConsumeMapRaw) {
+	var spellConsumeMap = {};
+	
+	var split = spellConsumeMapRaw.split(",");
+	for (var i = 0; i < split.length; i++) {
+		var entrySplit = split[i].split(":");
+		spellConsumeMap[entrySplit[0]] = parseInt(entrySplit[1]);
+	}
+
+	return spellConsumeMap;
+};
+
+gmReminders.WriteSpellConsumeMap = function(spellConsumeMap) {
+	var output = new Array();
+	for (var [key, value] of Object.entries(spellConsumeMap)) {
+		output.push(key + ":" + value);
+	}
+
+	return output.join(",");
+};
+
+gmReminders.ConsumeSpell = function(argsRaw) {
+	var args = argsRaw.split(" ");
+	var charID = args[0];
+	var level = args[1];
+	var spellName = args[2];
+
+	var currChar = getObj("graphic", charID);
+	if (currChar === undefined) {
+		return;
+	}
+
+	var gmnotes = currChar.get("gmnotes");
+	gmnotes = unescape(gmnotes);
+
+	if (gmnotes.length === 0) {
+		return;
+	}
+
+	var name = /(.*?) CR/;
+	var namematch = gmnotes.match(name);
+
+	if (namematch === null) {
+		return;
+	}
+
+	var lines = gmnotes.split("<br>");
+	var spellConsumeMapRaw = lines[lines.length-1];
+	var spellConsumeMap = {};
+	if (spellConsumeMapRaw.startsWith("SpellConsumeMap ")) {
+		spellConsumeMap = gmReminders.ParseSpellConsumeMap(spellConsumeMapRaw.replace("SpellConsumeMap ", ""));
+	} else {
+		lines.push("SpellConsumeMap ");
+	}
+
+	var key = level + "" + spellName;
+	
+	var value = spellConsumeMap[key];
+	if (value === undefined) {
+		value = 0;
+	}
+	log("previously consumed " + key + " " + value);
+
+	value++;
+	spellConsumeMap[key] = value;
+
+	lines[lines.length-1] = "SpellConsumeMap " + gmReminders.WriteSpellConsumeMap(spellConsumeMap);
+	currChar.set("gmnotes", lines.join("<br>"));
+
+	gmReminders.GenerateSpellbook(charID);
+};
+
 gmReminders.GenerateSpellbook = function(CharID) {
 	var currChar = getObj("graphic", CharID);
 	if (currChar === undefined) {
@@ -162,7 +234,7 @@ gmReminders.GenerateSpellbook = function(CharID) {
 
 	var lines = gmnotes.split("<br>");
 
-	var spells = new Array();
+	var spellLevels = new Array();
 	var inSpells = false;
 	var clAndDetails = "";
 	for (var i = 0; i < lines.length; i++) {
@@ -174,7 +246,7 @@ gmReminders.GenerateSpellbook = function(CharID) {
 			if (line.length > 0 && !line.match(/^\d/)) {
 				break;
 			} else if (line.length > 0) {
-				spells.push(line);
+				spellLevels.push(line);
 			}
 		}
 	}
@@ -183,14 +255,79 @@ gmReminders.GenerateSpellbook = function(CharID) {
 		return;
 	}
 
-	var message = "<b>Spellbook for " + namematch[1] + "</b>";
-	message += "<div>" + clAndDetails + "</div>";
-
-	message += "<ul>";
-	for (var i = 0; i < spells.length; i++) {
-		message += "<li>" + spells[i] + "</li>";
+	var spellConsumeMapRaw = lines[lines.length-1];
+	var spellConsumeMap = {};
+	if (spellConsumeMapRaw.startsWith("SpellConsumeMap ")) {
+		spellConsumeMap = gmReminders.ParseSpellConsumeMap(spellConsumeMapRaw.replace("SpellConsumeMap ", ""));
 	}
-	message += "</ul>";
+
+	var message = "<b>Spellbook for " + namematch[1] + "</b>";
+	message += "<div class='sheet-rolltemplate-default'><table><caption>" + clAndDetails.substr(0, clAndDetails.length-1) + "</caption>";
+	for (var i = 0; i < spellLevels.length; i++) {
+		var line = spellLevels[i];
+		var split1 = line.split("—");
+		var level = split1[0];
+		var levelOnly = level.split(" ")[0];
+		var spells = split1[1].split(", ");
+
+		if (level.startsWith("0") || level.startsWith("1")) {
+			continue;
+		}
+
+		message += "<tr><td style='vertical-align:top'>" + level + "</td><td>";
+		var isSorcerer = level.includes("(");
+		var fixedSpellCount = isSorcerer ? parseInt(level.split("(")[1].split("/")[0]) : -1;
+		
+		for (var s = 0; s < spells.length; s++) {
+			var spell = spells[s];
+			var spellText = spell;
+
+			var spellSplit = spell.split("(");
+			var spellName = spellSplit[0].trim();
+
+			var spellCount = fixedSpellCount != -1 ? fixedSpellCount : 1;
+
+			if (!isSorcerer && spellSplit.length > 1) {
+				var spellDetails = spellSplit[1];
+				var spellDetailsSplit = spellDetails.substr(0, spellDetails.length-1).split(",");
+
+				var possiblyCount = spellDetailsSplit[0];
+				if (!possiblyCount.startsWith("DC")) {
+					spellCount = parseInt(possiblyCount);
+
+					if (spellDetailsSplit.length > 1) {
+						spellText = spellName + " (" + spellDetailsSplit[1] + ")";
+					}
+				}
+			}
+
+			var dashedSpellName = spellName.toLowerCase().replace(/ /g, "-");
+			var url = "https://www.d20pfsrd.com/magic/all-spells/" + dashedSpellName.substr(0,1) + "/" + dashedSpellName;
+
+			var spellKey = isSorcerer ? "N/A" : dashedSpellName;
+
+			var key = levelOnly+spellKey;
+			var consumed = spellConsumeMap[key];
+			if (consumed === undefined) {
+				consumed = 0;
+			}
+			spellCount -= consumed;
+
+			if (spellCount == 0) {
+				message += "<div style='text-decoration:line-through'>";
+				message += "<a style='background:transparent;padding:0;' href='" + url + "'>" + spellText + "</a> ";
+				message += "</div>";
+			} else {
+				message += "<div>";
+				message += "<a style='background:transparent;padding:0;' href='" + url + "'>" + spellText + "</a> ";
+				message += "<a style='background:transparent;padding:0;color:DarkMagenta' href='!consumespell " + CharID + " " + levelOnly + " " + spellKey + "'>x" + spellCount + "</a>";
+				message += "</div>";
+			}
+		}
+
+		message += "</td></tr>";
+	}
+	message += "</table></div>";
 
 	sendChat("gmReminder", "/w gm " + message)
 };
@@ -362,6 +499,8 @@ on("chat:message", function (msg) {
 			gmReminders.DoAttack(msg.content.replace("!doattack ", ""));
 		} else if (msg.content.startsWith("!spellbook")) {
 			gmReminders.GenerateSpellbook(msg.content.replace("!spellbook ", ""));
+		} else if (msg.content.startsWith("!consumespell")) {
+			gmReminders.ConsumeSpell(msg.content.replace("!consumespell ", ""));
 		}
 	}
 });
