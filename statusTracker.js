@@ -1,6 +1,6 @@
 state.statusTagLookup = {};
 
-state.activeStatus = state.activeStatus || new Array();
+state.characterStatusMap = state.characterStatusMap || {};
  
 var StatusTracker = StatusTracker || {};
 
@@ -35,14 +35,20 @@ StatusTracker.SetCharacterCondition = function(CharID, statusName, value) {
 	}
 }
 
-StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration, Marker) {
-    if (CharID == "") return; //Don't add empty statuses
-	
-	for (var index = 0; index < state.activeStatus.length; index++) {
+StatusTracker.AddStatus = function(CharID, statusName, description, Duration, Marker) {
+    if (CharID == "") return;
+    
+    var charStatus = state.characterStatusMap[CharID];
+    if (charStatus === undefined) {
+        charStatus = new Array();
+        state.characterStatusMap[CharID] = charStatus;
+    }
+
+	for (var index = 0; index < charStatus.length; index++) {
 		var existing = state.activeStatus[index];
 		
-		if (existing.Name == statusName) {
-			var existingDuration = Number(existing.Duration || 1);
+		if (existing.Name === statusName) {
+			var existingDuration = existing.Duration;
 			
 			existing.Duration = Math.max(existingDuration, Duration);
 			StatusTracker.SendMessage("Status already exists, updating duration", true);
@@ -52,10 +58,9 @@ StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration,
 		}
 	}
     
-    state.activeStatus.push({
-        'CharID': CharID, 
+    charStatus.push({
         'Name': statusName, 
-        'Description': statusDescript, 
+        'Description': description, 
         'Duration': Duration,
         'Marker': Marker,
     });
@@ -65,17 +70,24 @@ StatusTracker.AddStatus = function(CharID, statusName, statusDescript, Duration,
 	StatusTracker.SetCharacterCondition(CharID, statusName, 1);
 }
  
-StatusTracker.DelStatus = function(CharID, Name){
-    for (var index = 0; index < state.activeStatus.length; index++) {
-		var status = state.activeStatus[index];
+StatusTracker.DelStatus = function(CharID, Name) {
+    var charStatus = state.characterStatusMap[CharID];
+    if (charStatus === undefined) {
+        return;
+    }
+
+    for (var index = 0; index < charStatus.length; index++) {
+		var status = charStatus[index];
 		
-        if (status.Name == Name && status.CharID === CharID) {
-            //Remove the relevant marker
-            StatusTracker.SetMarker(status.CharID, status.Marker, 0);
+        if (status.Name == Name) {
+            StatusTracker.SetMarker(CharID, status.Marker, 0);
             
-            state.activeStatus.splice(index, 1);
+            charStatus.splice(index, 1);
             index--;
         }
+    }
+    if (charStatus.length === 0) {
+        delete status[CharID];
     }
 	
 	StatusTracker.SetCharacterCondition(CharID, Name, 0);
@@ -145,76 +157,56 @@ StatusTracker.GetStatusMessage = function(statusName, duration, description) {
 }
 
 StatusTracker.PrintCharacterStatus = function(CharID) {
-    //loops through all durations and effects ones on the current character/token
-    if (state.activeStatus.length == 0) return;
-    
-    //If the current token does not have any statues, exit
-	var count = 0;
-    for (var index = 0; index < state.activeStatus.length; index++) {
-		var status = state.activeStatus[index];
-        if (status.CharID == CharID) { count++ }
+    var charStatus = state.characterStatusMap[CharID];
+    if (charStatus === undefined) {
+        return;
     }
-    if (count == 0) return;
+    if (charStatus.length === 0) {
+        return;
+    }
         
-    //Extract the current tokens name
     var charName = StatusTracker.GetTokenName(CharID)
     
 	var statusMessages = "/direct <b>" + charName + " status</b><ul>";
-    for (var index = 0; index < state.activeStatus.length; index++) {
-		var status = state.activeStatus[index];
+    for (var index = 0; index < charStatus.length; index++) {
+		var status = charStatus[index];
         
-        //Decrement Duration
-        var Duration = Number(status.Duration || 1);
+        var duration = status.Duration;
  
-		if (status.CharID == CharID) {		
-			//Still active, announced
-            var message = StatusTracker.GetStatusMessage(status.Name, Duration, status.Description);
-            var removeMessage = "";
-            if (Duration > 1 || Duration === -1) {
-                removeMessage = "  <a style='background:transparent; color:Red; float:right;padding:0' href='!status del " + status.Name + " " + CharID + "'>Remove</a>";
-            }
+        var message = StatusTracker.GetStatusMessage(status.Name, duration, status.Description);
+        var removeMessage = "";
+        if (duration > 1 || duration === -1) {
+            removeMessage = "  <a style='background:transparent; color:Red; float:right;padding:0' href='!status del " + status.Name + " " + CharID + "'>Remove</a>";
+        }
 
-			statusMessages += "<li><div align='left' style='clear:both'>" + message + removeMessage + "</div></li>";
-		}
+        statusMessages += "<li><div align='left' style='clear:both'>" + message + removeMessage + "</div></li>";
     }
 	statusMessages += "</ul><hr>";
 	StatusTracker.SendMessage(statusMessages);
 }
 
 StatusTracker.NewTurn = function(CharID) {    
-    //loops through all durations and effects ones on the current character/token
-    if (state.activeStatus.length == 0) return;
-    
-    //If the current token does not have any statues, exit
-	var count = 0;
-    for (var index = 0; index < state.activeStatus.length; index++) {
-		var status = state.activeStatus[index];
-        if (status.CharID == CharID) { count++ }
+    var charStatus = state.characterStatusMap[CharID];
+    if (charStatus === undefined) {
+        return;
     }
-    if (count == 0) return;
+    if (charStatus.length === 0) {
+        return;
+    }
         
-    for (var index = 0; index < state.activeStatus.length; index++) {
-		var status = state.activeStatus[index];
+    for (var index = 0; index < charStatus.length; index++) {
+		var status = charStatus[index];
+         
+		if (status.Duration > 0) {
+            status.Duration = status.Duration - 1;
+            StatusTracker.SetMarker(CharID, status.Marker, status.Duration);
+        }
         
-        //Decrement Duration
-        var Duration = Number(status.Duration || 1);
- 
-		if (status.CharID == CharID) {
-			// A -1 Duration is permanent, the current token/character's statuses are 
-			// increments for the next round.
-			if (Duration > 0) {
-				status.Duration = Duration - 1;
-				
-				StatusTracker.SetMarker(CharID, status.Marker, status.Duration);
-			}
-			
-			//Ending effects
-			if (status.Duration === 0) {
-                StatusTracker.DelStatus(status.CharID, status.Name);
-				
-				index--;
-			}
-		}
+        if (status.Duration === 0) {
+            StatusTracker.DelStatus(CharID, status.Name);
+            
+            index--;
+        }
     }
     
     StatusTracker.PrintCharacterStatus(CharID);
@@ -279,7 +271,7 @@ StatusTracker.OnStatusDel = function(args, selected) {
 };
 
 StatusTracker.OnStatusClearAll = function(args, selected) {
-    state.activeStatus = new Array();
+    state.characterStatusMap = {};
     sendChat("","/desc All statuses removed.");
 };
 
