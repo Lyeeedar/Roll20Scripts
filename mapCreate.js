@@ -77,12 +77,14 @@ mapCreate.Scatter = function(CharID, Count) {
     for (var i = 0; i < Count; i++) {
         var x = randomInteger(pageWidth);
         var y = randomInteger(pageHeight);
+        var rot = randomInteger(360);
 
         log("Create object at " + x + "," + y);
             var obj = createObj('graphic', {
                 name: 'mapTile',
                 left: x * 70,
                 top: y * 70,
+                rotation: rot,
                 width: width,
                 height: height,
                 imgsrc: img,
