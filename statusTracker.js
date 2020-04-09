@@ -298,50 +298,54 @@ on("change:campaign:turnorder", function(args) {
 });
 
 on("chat:message", function(msg) {
-    if (msg.type === "api" && msg.content.startsWith("!status")) {
-        var split = msg.content.splitArgs();
+    try {
+        if (msg.type === "api" && msg.content.startsWith("!status")) {
+            var split = msg.content.splitArgs();
 
-        var verb = split[1];
-        var args = split.slice(2);
+            var verb = split[1];
+            var args = split.slice(2);
 
-        if (verb === "add") 
-        {
-            StatusTracker.OnStatusAdd(args, msg.selected);
-        } 
-        else if (verb === "del" || verb === "remove") 
-        {
-            StatusTracker.OnStatusDel(args, msg.selected);
-        } 
-        else if (verb === "clearall") 
-        {
-            if (msg.who.includes("(GM)")) {
-                StatusTracker.OnStatusClearAll(args, msg.selected);
+            if (verb === "add") 
+            {
+                StatusTracker.OnStatusAdd(args, msg.selected);
             } 
+            else if (verb === "del" || verb === "remove") 
+            {
+                StatusTracker.OnStatusDel(args, msg.selected);
+            } 
+            else if (verb === "clearall") 
+            {
+                if (msg.who.includes("(GM)")) {
+                    StatusTracker.OnStatusClearAll(args, msg.selected);
+                } 
+                else 
+                {
+                    sendChat("","/desc This is a GM only command.");
+                }
+            }
+            else if (verb === "show")
+            {
+                StatusTracker.OnStatusShow(args, msg.selected);
+            }
+            else if (verb === "help" || verb === "?")
+            {
+                var message = "/direct !status usage:<ul>";
+
+                message += "<li>Add a status to the selected characters. Usage: !status add {name} {duration in rounds:-1 for permanent} {icon} {description}</li>";
+                message += "<li>Remove a status from the selected characters. Usage: !status del {name}</li>";
+                message += "<li>Show the status for the selected characters. Usage: !status show</li>";
+
+                message += "</ul>";
+
+                sendChat("", message);
+            }
             else 
             {
-                sendChat("","/desc This is a GM only command.");
+                sendChat("","/desc Unknown status verb " + split[1] + ".")
             }
         }
-        else if (verb === "show")
-        {
-            StatusTracker.OnStatusShow(args, msg.selected);
-        }
-        else if (verb === "help" || verb === "?")
-        {
-            var message = "/direct !status usage:<ul>";
-
-            message += "<li>Add a status to the selected characters. Usage: !status add {name} {duration in rounds:-1 for permanent} {icon} {description}</li>";
-            message += "<li>Remove a status from the selected characters. Usage: !status del {name}</li>";
-            message += "<li>Show the status for the selected characters. Usage: !status show</li>";
-
-            message += "</ul>";
-
-            sendChat("", message);
-        }
-        else 
-        {
-            sendChat("","/desc Unknown status verb " + split[1] + ".")
-        }
+    } catch (ex) {
+        sendChat("", "Error ocurred when running '" + msg.content + "': " + ex.message);
     }
 });
 
