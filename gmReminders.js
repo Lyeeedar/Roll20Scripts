@@ -1,4 +1,6 @@
 var gmReminders = gmReminders || {};
+gmReminders.customMessageMap = {};
+gmReminders.guid = 0;
 
 var attackregex = /(.+?) ([^\+]*?) (\+[0-9\/\+]+) \(([^\s]+)( plus ([^)]*))?\)/;
 gmReminders.DoAttack = function (rawattack) {
@@ -603,6 +605,17 @@ gmReminders.GenerateNotes = function (CharID) {
 				"<ul>"
 		);
 	}
+
+	var customMessages = gmReminders.customMessageMap[CharID];
+	if (customMessages != undefined) {
+		for (var i = 0; i < customMessages.length; i++) {
+			var message = customMessages[i];
+
+			var removeButton = "<div><a style='background:transparent; padding:0; color:Red' href='!removereminder " + CharID + " " + message.guid + "'>Remove</a><div>";
+
+			sendChat("gmReminder", "/w gm " + message.message + removeButton);
+		}
+	}
 };
 
 gmReminders.GetRegexMatch = function (content, regex) {
@@ -705,8 +718,6 @@ gmReminders.RollInitiative = function () {
 	log("Beginning set initiative");
 
 	var turnorderRaw = Campaign().get("turnorder");
-	log(turnorderRaw);
-
 	var turnorder;
 	if (turnorderRaw == "") {
 		turnorder = [];
@@ -732,7 +743,42 @@ gmReminders.RollInitiative = function () {
 	var turnorderOut = JSON.stringify(turnorder);
 	Campaign().set("turnorder", turnorderOut);
 	log("End set initiative");
-	log(turnorderOut);
+};
+
+gmReminders.AddCustomReminder = function (CharID, message) {
+
+	var charMessages = gmReminders.customMessageMap[CharID];
+	if (charMessages == undefined) {
+		charMessages = [];
+		gmReminders.customMessageMap[CharID] = charMessages;
+	}
+
+	charMessages.push({
+		charID: CharID,
+		message: message,
+		guid: gmReminders.guid++
+	});
+
+	gmReminders.GenerateNotes(CharID);
+};
+
+gmReminders.RemoveCustomReminder = function(argsRaw) {
+	var args = argsRaw.splitArgs();
+	var charID = args[0];
+	var guid = args[1];
+
+	var charMessages = gmReminders.customMessageMap[charID];
+	if (charMessages != undefined) {
+		for (var i = 0; i < charMessages.length; i++) {
+			var message = charMessages[i];
+			if (message.guid == guid) {
+				charMessages.splice(i, 1);
+				break;
+			}
+		}
+	};
+
+	gmReminders.GenerateNotes(charID);
 };
 
 on("change:campaign:turnorder", function (args) {
@@ -747,29 +793,41 @@ on("change:campaign:turnorder", function (args) {
 });
 
 on("chat:message", function (msg) {
-	if (msg.type === "api" && msg.who.includes("(GM)")) {
-		if (msg.content.startsWith("!gmreminder")) {
-			_.each(msg.selected, function (obj) {
-				if (obj._type == "graphic") {
-					gmReminders.GenerateNotes(obj._id);
-				}
-			});
-		} else if (msg.content.startsWith("!doattack")) {
-			gmReminders.DoAttack(msg.content.replace("!doattack ", ""));
-		} else if (msg.content.startsWith("!spellbook")) {
-			gmReminders.GenerateSpellbook(msg.content.replace("!spellbook ", ""));
-		} else if (msg.content.startsWith("!consumespell")) {
-			gmReminders.ConsumeSpell(msg.content.replace("!consumespell ", ""));
-		} else if (msg.content.startsWith("!roll")) {
-			gmReminders.ExecuteRoll(msg.content.replace("!roll ", ""));
-		} else if (msg.content.startsWith("!createcharacter")) {
-			_.each(msg.selected, function (obj) {
-				if (obj._type == "graphic") {
-					gmReminders.CreateCharacter(obj._id);
-				}
-			});
-		} else if (msg.content.startsWith("!initiative")) {
-			gmReminders.RollInitiative();
+	try {
+		if (msg.type === "api" && msg.who.includes("(GM)")) {
+			if (msg.content.startsWith("!gmreminder")) {
+				_.each(msg.selected, function (obj) {
+					if (obj._type == "graphic") {
+						gmReminders.GenerateNotes(obj._id);
+					}
+				});
+			} else if (msg.content.startsWith("!doattack")) {
+				gmReminders.DoAttack(msg.content.replace("!doattack ", ""));
+			} else if (msg.content.startsWith("!spellbook")) {
+				gmReminders.GenerateSpellbook(msg.content.replace("!spellbook ", ""));
+			} else if (msg.content.startsWith("!consumespell")) {
+				gmReminders.ConsumeSpell(msg.content.replace("!consumespell ", ""));
+			} else if (msg.content.startsWith("!roll")) {
+				gmReminders.ExecuteRoll(msg.content.replace("!roll ", ""));
+			} else if (msg.content.startsWith("!createcharacter")) {
+				_.each(msg.selected, function (obj) {
+					if (obj._type == "graphic") {
+						gmReminders.CreateCharacter(obj._id);
+					}
+				});
+			} else if (msg.content.startsWith("!initiative")) {
+				gmReminders.RollInitiative();
+			} else if (msg.content.startsWith("!addreminder")) {
+				_.each(msg.selected, function (obj) {
+					if (obj._type == "graphic") {
+						gmReminders.AddCustomReminder(obj._id, msg.content.replace("!addreminder ", ""));
+					}
+				});
+			} else if (msg.content.startsWith("!removereminder")) {
+				gmReminders.RemoveCustomReminder(msg.content.replace("!removereminder ", ""));
+			}
 		}
+	} catch (ex) {
+		sendChat("gmReminders", "/w gm Error ocurred whilst running '" + msg.content + "': " + ex.message);
 	}
 });
