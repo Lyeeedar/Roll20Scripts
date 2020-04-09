@@ -605,6 +605,10 @@ gmReminders.GenerateNotes = function (CharID) {
 				"<ul>"
 		);
 	}
+};
+
+gmReminders.PrintCreatureReminders = function (CharID) {
+	gmReminders.GenerateNotes(CharID);
 
 	var customMessages = gmReminders.customMessageMap[CharID];
 	if (customMessages != undefined) {
@@ -759,7 +763,7 @@ gmReminders.AddCustomReminder = function (CharID, message) {
 		guid: gmReminders.guid++
 	});
 
-	gmReminders.GenerateNotes(CharID);
+	gmReminders.PrintCreatureReminders(CharID);
 };
 
 gmReminders.RemoveCustomReminder = function(argsRaw) {
@@ -778,7 +782,7 @@ gmReminders.RemoveCustomReminder = function(argsRaw) {
 		}
 	};
 
-	gmReminders.GenerateNotes(charID);
+	gmReminders.PrintCreatureReminders(charID);
 };
 
 on("change:campaign:turnorder", function (args) {
@@ -789,7 +793,7 @@ on("change:campaign:turnorder", function (args) {
 	if (status_current_token.id === gmReminders.currentTurn) return;
 
 	gmReminders.currentTurn = status_current_token.id;
-	gmReminders.GenerateNotes(status_current_token.id);
+	gmReminders.PrintCreatureReminders(status_current_token.id);
 });
 
 on("chat:message", function (msg) {
@@ -798,7 +802,7 @@ on("chat:message", function (msg) {
 			if (msg.content.startsWith("!gmreminder")) {
 				_.each(msg.selected, function (obj) {
 					if (obj._type == "graphic") {
-						gmReminders.GenerateNotes(obj._id);
+						gmReminders.PrintCreatureReminders(obj._id);
 					}
 				});
 			} else if (msg.content.startsWith("!doattack")) {
