@@ -428,6 +428,29 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 	return creature;
 }
 
+gmReminders.TryParseCreature = function(CharID) {
+	var currChar = getObj("graphic", CharID);
+	if (currChar === undefined) {
+		return null;
+	}
+
+	var gmnotes = currChar.get("gmnotes");
+	gmnotes = unescape(gmnotes);
+
+	if (gmnotes.length === 0) {
+		return null;
+	}
+
+	var nameRegex = /(.*?) CR/;
+	var namematch = gmnotes.match(nameRegex);
+
+	if (namematch === null) {
+		return null;
+	}
+
+	return gmReminders.ParseCreatureStatBlock(gmnotes);
+};
+
 gmReminders.GenerateNotes = function (CharID) {
 	var currChar = getObj("graphic", CharID);
 	if (currChar === undefined) {
@@ -678,6 +701,40 @@ gmReminders.CreateCharacter = function(CharID) {
 	sendChat("gmReminder", "/w gm Character created for " + creature["name"]);
 };
 
+gmReminders.RollInitiative = function () {
+	log("Beginning set initiative");
+
+	var turnorderRaw = Campaign().get("turnorder");
+	log(turnorderRaw);
+
+	var turnorder;
+	if (turnorderRaw == "") {
+		turnorder = [];
+	} else {
+		turnorder = JSON.parse(turnorderRaw);
+	}
+
+	for (var i = 0; i < turnorder.length; i++) {
+		var turn = turnorder[i];
+
+		if (turn.pr == null || turn.pr == "0") {
+			var creature = gmReminders.TryParseCreature(turn.id);
+			if (creature != null) {
+				var init = parseInt(creature["init"].replace("Init ", ""));
+				var initiativeValue = randomInteger(20) + init;
+				turn.pr = initiativeValue;
+
+				sendChat("gmReminders", "/w gm Rolling initiative for " + creature["name"] + ": 1d20+" + init + " = " + initiativeValue);
+			}
+		}
+	}
+
+	var turnorderOut = JSON.stringify(turnorder);
+	Campaign().set("turnorder", turnorderOut);
+	log("End set initiative");
+	log(turnorderOut);
+};
+
 on("change:campaign:turnorder", function (args) {
 	var status_current_token = gmReminders.GetCurrentToken();
 
@@ -711,6 +768,8 @@ on("chat:message", function (msg) {
 					gmReminders.CreateCharacter(obj._id);
 				}
 			});
+		} else if (msg.content.startsWith("!initiative")) {
+			gmReminders.RollInitiative();
 		}
 	}
 });
