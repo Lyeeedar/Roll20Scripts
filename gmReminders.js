@@ -244,6 +244,10 @@ gmReminders.BuildAttackButtons = function (attackraw) {
 			adjustedAttack = "1 " + adjustedAttack;
 		}
 		var match = adjustedAttack.match(attackregex);
+		if (match == null) {
+			return attack;
+		}
+
 		var attackname = match[2];
 		var namesplit = attackname.split(" ");
 		var shortname = namesplit[namesplit.length - 1];
@@ -503,7 +507,7 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 			creature["fasthealing"] = match[1];
 		}
 
-		var nameRegex = /(.*?) CR /;
+		var nameRegex = /(.*?) CR [0-9]+/;
 		var namematch = line.match(nameRegex);
 		if (namematch !== null) {
 			var name = namematch[1];
