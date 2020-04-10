@@ -16,8 +16,6 @@ gmReminders.DoRollArbitraryDice = function (roll) {
 }
 
 gmReminders.EvaluateDiceExpression = function (roll) {
-	log(roll);
-
 	let diceRegex = /[0-9]+d[0-9]+(>[0-9]+)?/
 
 	let remainingRoll = roll;
@@ -614,13 +612,13 @@ gmReminders.GenerateNotes = function (CharID) {
 		ac += " " + creature["cmd"];
 
 		var fort = creature["fort"];
-		var fortButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Fort 1d20" + fort.replace("Fort ", "") + "' title='" + fort + "'>Fort</a>"
+		var fortButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll \"" + name + "-Fort\" 1d20" + fort.replace("Fort ", "") + "' title='" + fort + "'>Fort</a>"
 
 		var ref = creature["ref"];
-		var refButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Ref 1d20" + ref.replace("Ref ", "") + "' title='" + ref + "'>Ref</a>"
+		var refButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll \"" + name + "-Ref\" 1d20" + ref.replace("Ref ", "") + "' title='" + ref + "'>Ref</a>"
 
 		var will = creature["will"];
-		var willButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-Will 1d20" + will.replace("Will ", "") + "' title='" + will + "'>Will</a>"
+		var willButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll \"" + name + "-Will\" 1d20" + will.replace("Will ", "") + "' title='" + will + "'>Will</a>"
 
 		message +=
 			"<li><a style='color:DeepSkyBlue' title='" +
@@ -652,7 +650,7 @@ gmReminders.GenerateNotes = function (CharID) {
 		);
 
 		var cmb = creature["cmb"];
-		var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll " + name + "-CMB 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
+		var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll \"" + name + "-CMB\" 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
 
 		message +=
 			"<li><div align='left' style='clear:both'>Melee:" +
@@ -771,7 +769,7 @@ gmReminders.GetCurrentToken = function () {
 };
 
 gmReminders.ExecuteRoll = function(argsraw) {
-	var args = argsraw.split(" ");
+	var args = argsraw.splitArgs();
 	sendChat("gmReminder", "/w gm " + args[0] + ": [[" + args[1] + "]]");
 }
 
