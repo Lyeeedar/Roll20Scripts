@@ -1,6 +1,7 @@
 var gmReminders = gmReminders || {};
 gmReminders.customMessageMap = {};
 gmReminders.guid = 0;
+gmReminders.cachedCreatureMap = {};
 
 gmReminders.DoRollArbitraryDice = function (roll) {
 	var result = gmReminders.EvaluateDiceExpression(roll);
@@ -549,6 +550,11 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 }
 
 gmReminders.TryParseCreature = function(CharID) {
+	var cached = gmReminders.cachedCreatureMap[CharID];
+	if (cached !== undefined) {
+		return cached;
+	}
+
 	var currChar = getObj("graphic", CharID);
 	if (currChar === undefined) {
 		return null;
@@ -568,33 +574,17 @@ gmReminders.TryParseCreature = function(CharID) {
 		return null;
 	}
 
-	return gmReminders.ParseCreatureStatBlock(gmnotes);
+	var creature = gmReminders.ParseCreatureStatBlock(gmnotes);
+	gmReminders.cachedCreatureMap[CharID] = creature;
+
+	return creature;
 };
 
 gmReminders.GenerateNotes = function (CharID) {
-	var currChar = getObj("graphic", CharID);
-	if (currChar === undefined) {
-		return;
-	}
-
-	var gmnotes = currChar.get("gmnotes");
-	gmnotes = unescape(gmnotes);
-
-	if (gmnotes.length === 0) {
-		return;
-	}
-
-	var nameRegex = /(.*?) CR/;
-	var namematch = gmnotes.match(nameRegex);
-
-	if (namematch === null) {
-		return;
-	}
-	var name = namematch[1];
-
 	var message = "";
 
-	var creature = gmReminders.ParseCreatureStatBlock(gmnotes);
+	var creature = gmReminders.TryParseCreature(CharID);
+	let name = creature["name"];
 
 	if (creature["aura"] !== undefined) {
 		message +=
