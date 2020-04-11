@@ -245,21 +245,16 @@ gmReminders.BuildAttackButtons = function (attackraw) {
 		}
 		var match = adjustedAttack.match(attackregex);
 		if (match == null) {
-			return attack;
+			output +=
+			`  <a style='background:transparent; color:Red; padding:0; padding-right:5px' title='${attack}' href='!doattack ${attack} (0)'>${attack}</a>`;
+		} else {
+			var attackname = match[2];
+			var namesplit = attackname.split(" ");
+			var shortname = namesplit[namesplit.length - 1];
+	
+			output +=
+				`  <a style='background:transparent; color:Red; padding:0; padding-right:5px' title='${attack}' href='!doattack ${attack}'>${shortname}</a>`;
 		}
-
-		var attackname = match[2];
-		var namesplit = attackname.split(" ");
-		var shortname = namesplit[namesplit.length - 1];
-
-		output +=
-			"  <a style='background:transparent; color:Red; padding:0; padding-right:5px' title='" +
-			attack +
-			"' href='!doattack " +
-			attack +
-			"'>" +
-			shortname +
-			"</a>";
 	}
 
 	return output;
@@ -543,7 +538,7 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 		gmReminders.InsertIfMatches(line, /Speed .*/, creature, "speed");
 		gmReminders.InsertIfMatches(line, /Init [^;]+/, creature, "init");
 		gmReminders.InsertIfMatches(line, /Space [0-9]+ ft/, creature, "space");
-		gmReminders.InsertIfMatches(line, /Reach [0-9]+ ft/, creature, "reach");
+		gmReminders.InsertIfMatches(line, /Reach [^;]+/, creature, "reach");
 
 		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
 			creature["spells"] = line;
@@ -646,10 +641,10 @@ gmReminders.GenerateNotes = function (CharID) {
 		var cmb = creature["cmb"];
 		var cmbButton = "<a style='background:transparent;padding:0;padding-left:5px;color:DarkSlateBlue' href='!roll \"" + name + "-CMB\" 1d20" + cmb.replace("CMB ", "") + "' title='" + cmb + "'>CMB</a>"
 
+		var reach = creature["reach"] || "Reach 5 ft.";
+
 		message +=
-			"<li><div align='left' style='clear:both'>Melee:" +
-			attackButton + cmbButton +
-			"</div></li>";
+			`<li><div align='left' style='clear:both'><a style='color:black' title='${reach}'>Melee:</a> ${attackButton}${cmbButton}</div></li>`;
 	}
 
 	if (creature["ranged"] !== undefined) {
