@@ -660,14 +660,19 @@ gmReminders.RemoveCustomReminder = function(argsRaw) {
 };
 
 on("change:campaign:turnorder", function (args) {
-	var status_current_token = gmReminders.GetCurrentToken();
+	try {
+		var status_current_token = gmReminders.GetCurrentToken();
 
-	if (status_current_token === "") return;
+		if (status_current_token === "") return;
 
-	if (status_current_token.id === gmReminders.currentTurn) return;
+		if (status_current_token.id === gmReminders.currentTurn) return;
 
-	gmReminders.currentTurn = status_current_token.id;
-	gmReminders.PrintCreatureReminders(status_current_token.id);
+		gmReminders.currentTurn = status_current_token.id;
+		gmReminders.PrintCreatureReminders(status_current_token.id);
+	}
+	catch (ex) {
+		log("On turn crash: " + ex.message);
+	}
 });
 
 on("chat:message", function (msg) {
