@@ -129,16 +129,23 @@ gmReminders.GenerateSpellbook = function(CharID) {
 	var spellLevels = new Array();
 	var inSpells = false;
 	var clAndDetails = "";
+	var isMonster = false;
 	for (var i = 0; i < lines.length; i++) {
 		var line = lines[i].trim();
 		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
 			inSpells = true;
 			clAndDetails = line.split("(")[1];
+		} else if (line.includes("Spell-Like Abilities (CL ")) {
+			inSpells = true;
+			isMonster = true;
+			clAndDetails = line.split("(")[1];
 		} else if (inSpells) {
-			if (line.length > 0 && !line.match(/^\d/)) {
-				break;
-			} else if (line.length > 0) {
-				spellLevels.push(line);
+			if (line.length > 0) {
+				if (line.includes("—")) {
+					spellLevels.push(line);
+				} else {
+					break;
+				}
 			}
 		}
 	}
@@ -162,13 +169,19 @@ gmReminders.GenerateSpellbook = function(CharID) {
 		var levelOnly = level.split(" ")[0];
 		var spells = split1[1].split(", ");
 
-		if (level.startsWith("0") || level.startsWith("1")) {
-			continue;
+		if (isMonster) {
+			if (level.startsWith("Constant")) {
+				continue;
+			}
+		} else {
+			if (level.startsWith("0") || level.startsWith("1")) {
+				continue;
+			}
 		}
 
 		message += "<tr><td style='vertical-align:top'>" + level + "</td><td>";
 		var isSorcerer = level.includes("(");
-		var fixedSpellCount = isSorcerer ? parseInt(level.split("(")[1].split("/")[0]) : -1;
+		var fixedSpellCount = isSorcerer && !isMonster ? parseInt(level.split("(")[1].split("/")[0]) : -1;
 		
 		for (var s = 0; s < spells.length; s++) {
 			var spell = spells[s];
@@ -179,7 +192,13 @@ gmReminders.GenerateSpellbook = function(CharID) {
 
 			var spellCount = fixedSpellCount != -1 ? fixedSpellCount : 1;
 
-			if (!isSorcerer && spellSplit.length > 1) {
+			if (isMonster) {
+				if (level.includes("will")) {
+					spellCount = 99;
+				} else {
+					spellCount = parseInt(level.split("/")[0]);
+				}
+			} else if (!isSorcerer && spellSplit.length > 1) {
 				var spellDetails = spellSplit[1];
 				var spellDetailsSplit = spellDetails.substr(0, spellDetails.length-1).split(",");
 
@@ -196,7 +215,7 @@ gmReminders.GenerateSpellbook = function(CharID) {
 			var dashedSpellName = spellName.toLowerCase().replace(/ /g, "-");
 			var url = "https://www.d20pfsrd.com/magic/all-spells/" + dashedSpellName.substr(0,1) + "/" + dashedSpellName;
 
-			var spellKey = isSorcerer ? "N/A" : dashedSpellName;
+			var spellKey = isSorcerer && !isMonster ? "N/A" : dashedSpellName;
 
 			var key = levelOnly+spellKey;
 			var consumed = spellConsumeMap[key];
@@ -312,7 +331,7 @@ gmReminders.ParseCreatureStatBlock = function(statblock) {
 		gmReminders.InsertIfMatches(line, /Space [0-9]+ ft/, creature, "space");
 		gmReminders.InsertIfMatches(line, /Reach [^;]+/, creature, "reach");
 
-		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ")) {
+		if (line.includes(" Spells Prepared (CL ") || line.includes(" Spells Known (CL ") || line.includes("Spell-Like Abilities (CL ")) {
 			creature["spells"] = line;
 		}
 	}
